@@ -1,0 +1,33 @@
+        function showUnauthenticatedUser() {
+            // Show auth links, hide user info
+            document.getElementById('auth-links').style.display = 'inline';
+            document.getElementById('user-links').style.display = 'none';
+            
+            // Show prominent message for unauthenticated users
+            const resultsSection = document.getElementById('resultsSection');
+            if (resultsSection) {
+                resultsSection.classList.remove('hidden');
+                const resultsContent = document.getElementById('resultsContent');
+                if (resultsContent) {
+                    resultsContent.innerHTML = `
+                        <div class="auth-required-message">
+                            <div class="auth-icon">
+                                <i class="fas fa-lock"></i>
+                            </div>
+                            <h3>Welcome to Koby's AI Assistant</h3>
+                            <p>Please login or create an account to start using the search functionality.</p>
+                            <div class="auth-buttons">
+                                <button onclick="window.location.href='/'" class="auth-login-btn">
+                                    <i class="fas fa-sign-in-alt"></i>
+                                    Login
+                                </button>
+                                <button onclick="window.location.href='/create-account/'" class="auth-signup-btn">
+                                    <i class="fas fa-user-plus"></i>
+                                    Create Account
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        }

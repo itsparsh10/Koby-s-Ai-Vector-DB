@@ -1,0 +1,14 @@
+Django>=4.2
+djangorestframework
+django-cors-headers
+PyPDF2
+sentence-transformers>=2.2.2
+faiss-cpu
+numpy
+tqdm
+openai
+python-dotenv
+Pillow
+google-generativeai
+mongoengine
+pymongo
