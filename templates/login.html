@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login Page</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      height: 100vh;
+      display: flex;
+    }
+
+    /* Left panel */
+    .left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 3rem 4rem;
+    }
+
+    .left h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .left p {
+      margin-bottom: 2rem;
+      color: #555;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.9rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 0.8rem 1rem;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 1rem;
+    }
+
+    .password-wrapper {
+      position: relative;
+    }
+
+    .password-wrapper input {
+      padding-right: 2.5rem;
+    }
+
+    .password-wrapper .toggle-password {
+      position: absolute;
+      right: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      font-size: 1.1rem;
+      color: #666;
+    }
+
+    .options {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 0.8rem 0 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    .options a {
+      color: #8b5cf6;
+      text-decoration: none;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 0.9rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .btn.signin {
+      background: #000;
+      color: #fff;
+      margin-bottom: 1.5rem;
+    }
+
+    .divider {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      position: relative;
+      font-size: 0.9rem;
+      color: #777;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 1px;
+      background: #ddd;
+    }
+
+    .divider::before {
+      left: 0;
+    }
+
+    .divider::after {
+      right: 0;
+    }
+
+    .btn.google {
+      border: 1px solid #ddd;
+      background: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn.google img {
+      width: 18px;
+    }
+
+    .create-account {
+      text-align: center;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    .create-account a {
+      color: #8b5cf6;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    /* Right panel */
+    .right {
+      flex: 1;
+      background: linear-gradient(
+        to bottom,
+        #d9d8f5,
+        #a68bd7,
+        #e35669,
+        #f37e4c,
+        #f9c86a
+      );
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+
+
+    .testimonial {
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(15px);
+      border-radius: 15px;
+      padding: 1rem 1.2rem;
+      color: #fff;
+      max-width: 280px;
+      font-size: 0.9rem;
+    }
+
+    .testimonial img {
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      float: left;
+      margin-right: 10px;
+    }
+
+    .testimonial strong {
+      display: block;
+      font-size: 0.95rem;
+    }
+
+    .testimonial span {
+      font-size: 0.8rem;
+      opacity: 0.8;
+    }
+
+    .testimonial p {
+      margin-top: 0.5rem;
+      line-height: 1.4;
+    }
+
+    .message {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+  </style>
+</head>
+<body>
+  <div class="left">
+    <h1>Welcome</h1>
+    <p>Access your account and continue your journey with us</p>
+
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" placeholder="Enter your email address" required />
+      </div>
+
+      <div class="form-group password-wrapper">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Enter your password" required />
+        <span class="toggle-password" onclick="togglePassword()">👁</span>
+      </div>
+
+      <div class="options">
+        <label><input type="checkbox" /> Keep me signed in</label>
+        <a href="#">Reset password</a>
+      </div>
+
+      <button type="submit" class="btn signin" id="signinButton">Sign In</button>
+    </form>
+
+    <div class="divider">Or continue with</div>
+
+    <button class="btn google">
+      <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google Logo"/> 
+      Continue with Google
+    </button>
+
+    <div class="create-account">
+      New to our platform? <a href="/create-account/">Create Account</a>
+    </div>
+  </div>
+
+  <div class="right">
+  </div>
+
+  <script>
+    function togglePassword() {
+      const passwordInput = document.getElementById("password");
+      if (passwordInput.type === "password") {
+        passwordInput.type = "text";
+      } else {
+        passwordInput.type = "password";
+      }
+    }
+
+    // Check authentication status on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      checkAuthStatus();
+    });
+    
+    // Helper function to redirect users based on their role
+    function redirectBasedOnRole(userRole, context = '') {
+      console.log(`${context}User role: ${userRole}`);
+      
+      if (userRole === 'admin' || userRole === 'manager') {
+        // Admin and Manager users go to admin panel
+        console.log(`Redirecting ${userRole} to admin panel`);
+        showMessage(`Welcome ${userRole}! Redirecting to admin panel...`, 'success');
+        setTimeout(() => {
+          window.location.href = '/admin-panel/';
+        }, 1500);
+      } else {
+        // Regular users go to home page
+        console.log(`Redirecting ${userRole || 'user'} to home page`);
+        showMessage(`Welcome! Redirecting to home page...`, 'success');
+        setTimeout(() => {
+          window.location.href = '/home/';
+        }, 1500);
+      }
+    }
+    
+    function checkAuthStatus() {
+      fetch('/api/auth/check/')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.authenticated) {
+            // User is already logged in, redirect based on role
+            const userRole = data.user?.role;
+            redirectBasedOnRole(userRole, 'Already authenticated ');
+          }
+        })
+        .catch(error => {
+          console.log('Not authenticated, showing login form');
+        });
+    }
+    
+    function handleLogin(event) {
+      event.preventDefault();
+      
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const signinButton = document.getElementById('signinButton');
+      
+      // Basic validation
+      if (!email) {
+        showMessage('Please enter your email address', 'error');
+        return;
+      }
+      
+      if (!password) {
+        showMessage('Please enter your password', 'error');
+        return;
+      }
+      
+      if (!isValidEmail(email)) {
+        showMessage('Please enter a valid email address', 'error');
+        return;
+      }
+      
+      // Show loading state
+      signinButton.textContent = 'Signing In...';
+      signinButton.disabled = true;
+      
+      // Make API call
+      fetch('/api/auth/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          password: password
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Check user role and redirect accordingly
+          const userRole = data.user?.role;
+          redirectBasedOnRole(userRole, 'Login successful - ');
+        } else {
+          showMessage(data.message, 'error');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        showMessage('An error occurred. Please try again.', 'error');
+      })
+      .finally(() => {
+        // Reset button state
+        signinButton.textContent = 'Sign In';
+        signinButton.disabled = false;
+      });
+    }
+    
+    function isValidEmail(email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email);
+    }
+    
+    function showMessage(message, type) {
+      // Remove existing message
+      const existingMessage = document.querySelector('.message');
+      if (existingMessage) {
+        existingMessage.remove();
+      }
+      
+      // Create new message
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${type}`;
+      messageDiv.textContent = message;
+      
+      // Insert message after the form
+      const form = document.getElementById('loginForm');
+      form.parentNode.insertBefore(messageDiv, form.nextSibling);
+      
+      // Auto-remove message after 5 seconds
+      setTimeout(() => {
+        if (messageDiv.parentNode) {
+          messageDiv.remove();
+        }
+      }, 5000);
+    }
+  </script>
+</body>
+</html>

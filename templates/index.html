@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koby's AI Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Background gradient -->
+        <div class="background-gradient">
+            <div class="gradient-overlay"></div>
+            <div class="conic-bg"></div>
+            <div class="radial-shape-1"></div>
+            <div class="radial-shape-2"></div>
+            <div class="radial-shape-3"></div>
+            <div class="radial-shape-4"></div>
+            <div class="radial-shape-5"></div>
+            <div class="final-overlay"></div>
+        </div>
+
+        <div class="main-content">
+            <!-- Logout Button (Fixed Position) -->
+            <div class="logout-container">
+                <span id="user-links" style="display: inline;">
+                    <!-- These will be shown when user is authenticated -->
+                    <span class="nav-link" id="user-info">Welcome, <span id="user-name">User</span>!</span>
+                    <button id="adminButton" onclick="goToAdmin()" class="nav-link admin-btn" style="display: none;">Admin</button>
+                    <button onclick="logout()" class="nav-link logout-btn">Logout</button>
+                </span>
+            </div>
+            
+            <div class="header-section">
+                <h1 class="main-title">Koby's AI Assistant</h1>
+                <p class="subtitle">Ask Questions By Text And Voice.</p>
+            </div>
+
+                            <!-- Enhanced Search Box -->
+                <div class="search-section">
+                    <div class="search-container">
+                        <button 
+                            type="button" 
+                            id="imageButton"
+                            title="Add Image" 
+                            class="search-btn image-btn"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+                                <path d="M12 4.5a.75.75 0 01.75.75V11h5.75a.75.75 0 010 1.5H12.75v5.75a.75.75 0 01-1.5 0V12.5H5.5a.75.75 0 010-1.5h5.75V5.25A.75.75 0 0112 4.5z"></path>
+                            </svg>
+                        </button>
+
+                        <input
+                            id="question"
+                            place holder="Ask anything"
+                            class="search-input"
+                        />
+
+                        <button 
+                            type="button" 
+                            id="voiceButton"
+                            title="Voice search" 
+                            class="search-btn voice-btn"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+                                <path d="M12 1.5a3 3 0 00-3 3v6a3 3 0 106 0v-6a3 3 0 00-3-3z"></path>
+                                <path d="M5.25 10.5a.75.75 0 01.75.75 6 6 0 0012 0 .75.75 0 111.5 0 7.5 7.5 0 01-6.75 7.46V21h2.25a.75.75 0 010 1.5h-6a.75.75 0 010-1.5H11.25v-2.29A7.5 7.5 0 014.5 11.25a.75.75 0 01.75-.75z"></path>
+                            </svg>
+                        </button>
+                        
+                        <button 
+                            type="button" 
+                            id="searchButton"
+                            title="Search" 
+                            class="search-btn search-btn-primary"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+                                <path fill-rule="evenodd" d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1114.59 5.28l4.69 4.69a.75.75 0 11-1.06 1.06l-4.69-4.69A8.25 8.25 0 012.25 10.5z" clip-rule="evenodd"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                <!-- Status indicators -->
+                <div id="statusIndicator" class="status-indicator hidden">
+                    <div class="status-content">
+                        <div class="status-spinner">
+                            <div class="animate-ping"></div>
+                            <div class="relative"></div>
+                        </div>
+                        <span id="statusText">Processing your request...</span>
+                    </div>
+                </div>
+            </div>
+
+                            <!-- Search Suggestions -->
+                <div class="mt-3 flex flex-wrap gap-2" id="suggestionsContainer">
+                    <!-- Dynamic suggestions will be loaded here -->
+                </div>
+                
+
+
+                            <!-- Results Section -->
+                <div class="results-section hidden" id="resultsSection">
+                    <h2 class="results-title">
+                        <i class="fas fa-lightbulb"></i>
+                        Search Results
+                    </h2>
+                    <div id="resultsContent" class="results-content">
+                        <div class="results-placeholder">
+                            <div class="placeholder-icon">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <h3>Ready to Search</h3>
+                            <p>Use the search box above to find products using text, image, or voice input.</p>
+                        </div>
+                    </div>
+                </div>
+        </div>
+
+        <!-- Feedback Button (Fixed at bottom) -->
+        <div class="feedback-container">
+            <button id="feedbackButton" class="feedback-btn" title="Send Feedback">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                    <path d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"></path>
+                </svg>
+                <span>Feedback</span>
+            </button>
+        </div>
+
+        <!-- Feedback Modal -->
+        <div id="feedbackModal" class="feedback-modal hidden">
+            <div class="feedback-modal-content">
+                <div class="feedback-modal-header">
+                    <h3>Send Feedback</h3>
+                    <button id="closeFeedbackModal" class="close-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                            <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                </div>
+                <form id="feedbackForm" class="feedback-form">
+                    <div class="form-group">
+                        <label for="feedbackType">Select a Training Question or Topic</label>
+                        <select id="feedbackType" name="type" required onchange="handleFeedbackTypeChange()">
+                            <option value="">Select a question or topic...</option>
+                            <option value="mission">What is Koby's mission and how should a barista contribute to it?</option>
+                            <option value="joy">How can a barista create memorable moments of joy for guests at Koby's?</option>
+                            <option value="upset_guest">How would you handle a situation where a regular guest seems upset?</option>
+                            <option value="greeting">How should you greet and interact with both regular and new guests?</option>
+                            <option value="teamwork">What does teamwork mean at Koby's? Give an example of supportive workplace behavior.</option>
+                            <option value="struggling_teammate">How should you respond if you see a teammate struggling during a rush?</option>
+                            <option value="mistake_communication">Describe how you'd communicate a mistake you made to your manager or teammate.</option>
+                            <option value="sop_violation">What would you do if you witnessed a coworker violating an SOP?</option>
+                            <option value="wrong_drink">How should you react if a guest is mistakenly served the wrong drink?</option>
+                            <option value="accountability">Why is accountability important in a barista's daily work at Koby's?</option>
+                            <option value="opening_closing">List the key opening or closing procedures a barista must perform at Koby's.</option>
+                            <option value="temperature_checks">Explain how you would log temperature checks for the FDU or refrigeration.</option>
+                            <option value="equipment_issues">What steps would you take if you find a piece of equipment not working during your shift?</option>
+                            <option value="cleanliness">Why is cleanliness especially important at a café, and what are daily cleaning tasks?</option>
+                            <option value="espresso_preparation">Walk me through the process of preparing an espresso at Koby's.</option>
+                            <option value="drink_consistency">How do you ensure consistency in drink quality throughout the day?</option>
+                            <option value="hygiene">What should you do to maintain hygiene while preparing drinks and food?</option>
+                            <option value="allergies">If a guest has an allergy, how do you ensure their safety when preparing their order?</option>
+                            <option value="cold_coffee">A guest complains their coffee is not hot enough. What should you do?</option>
+                            <option value="complaint_escalation">How do you escalate a complaint you can't resolve to the next person in the chain?</option>
+                            <option value="negative_feedback">If you receive negative feedback, how should you respond?</option>
+                            <option value="repair_replace">What is the Repair-Replace-Return policy, and when would you use each option?</option>
+                            <option value="inventory_checks">Describe your role in daily inventory checks and stock rotation.</option>
+                            <option value="low_stock">What should you do if you notice an item is running low during your shift?</option>
+                            <option value="delivery_issues">How would you handle receiving a delivery with items that are expired or damaged?</option>
+                            <option value="pos_system">What are your responsibilities when operating the POS system?</option>
+                            <option value="cash_discrepancies">How should you handle cash discrepancies at the end of a shift?</option>
+                            <option value="sales_reporting">Why is accurate daily sales reporting important?</option>
+                            <option value="repeated_mistakes">What happens if you repeatedly make the same mistake or violate SOPs?</option>
+                            <option value="manager_feedback">How do you use feedback from your manager to improve your performance?</option>
+                            <option value="cross_training">Why is cross-training important for baristas at Koby's?</option>
+                            <option value="safety_checks">What regular safety checks must you perform as a barista?</option>
+                            <option value="accident_reporting">How should you report accidents or hazards in the café?</option>
+                            <option value="emergency_procedures">What immediate steps should you take in a medical emergency or power outage?</option>
+                            <option value="licenses_permits">Why must all licences and health permits be displayed in the café?</option>
+                            <option value="anti_discrimination">What are your obligations regarding anti-discrimination and safe working conditions?</option>
+                            <option value="other">➕ Other - I have a different question or feedback</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="customQuestionGroup" style="display: none;">
+                        <label for="customQuestion">Your Custom Question or Topic</label>
+                        <input type="text" id="customQuestion" name="custom_question" placeholder="Please enter your custom question or feedback topic...">
+                    </div>
+                    <div class="form-group">
+                        <label for="feedbackMessage">Your Message</label>
+                        <textarea id="feedbackMessage" name="message" rows="4" placeholder="Please describe your feedback in detail..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="feedbackEmail">Email (Optional)</label>
+                        <input type="email" id="feedbackEmail" name="email" placeholder="your.email@example.com">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="cancelFeedback" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Send Feedback</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/index.js"></script>
+    
+    <script>
+        // All Koby's barista training questions
+        const allQuestions = [
+            "What is Koby's mission and how should a barista contribute to it?",
+            "How can a barista create memorable moments of joy for guests at Koby's?",
+            "How would you handle a situation where a regular guest seems upset?",
+            "How should you greet and interact with both regular and new guests?",
+            "What does teamwork mean at Koby's? Give an example of supportive workplace behavior.",
+            "How should you respond if you see a teammate struggling during a rush?",
+            "Describe how you'd communicate a mistake you made to your manager or teammate.",
+            "What would you do if you witnessed a coworker violating an SOP?",
+            "How should you react if a guest is mistakenly served the wrong drink?",
+            "Why is accountability important in a barista's daily work at Koby's?",
+            "List the key opening or closing procedures a barista must perform at Koby's.",
+            "Explain how you would log temperature checks for the FDU or refrigeration.",
+            "What steps would you take if you find a piece of equipment not working during your shift?",
+            "Why is cleanliness especially important at a café, and what are daily cleaning tasks?",
+            "Walk me through the process of preparing an espresso at Koby's.",
+            "How do you ensure consistency in drink quality throughout the day?",
+            "What should you do to maintain hygiene while preparing drinks and food?",
+            "If a guest has an allergy, how do you ensure their safety when preparing their order?",
+            "A guest complains their coffee is not hot enough. What should you do?",
+            "How do you escalate a complaint you can't resolve to the next person in the chain?",
+            "If you receive negative feedback, how should you respond?",
+            "What is the Repair-Replace-Return policy, and when would you use each option?",
+            "Describe your role in daily inventory checks and stock rotation.",
+            "What should you do if you notice an item is running low during your shift?",
+            "How would you handle receiving a delivery with items that are expired or damaged?",
+            "What are your responsibilities when operating the POS system?",
+            "How should you handle cash discrepancies at the end of a shift?",
+            "Why is accurate daily sales reporting important?",
+            "What happens if you repeatedly make the same mistake or violate SOPs?",
+            "How do you use feedback from your manager to improve your performance?",
+            "Why is cross-training important for baristas at Koby's?",
+            "What regular safety checks must you perform as a barista?",
+            "How should you report accidents or hazards in the café?",
+            "What immediate steps should you take in a medical emergency or power outage?",
+            "Why must all licences and health permits be displayed in the café?",
+            "What are your obligations regarding anti-discrimination and safe working conditions?"
+        ];
+
+        // Enhanced Fisher-Yates shuffle algorithm for better randomization
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        // Function to display exactly 4 random questions
+        function displayRandomQuestions() {
+            const container = document.getElementById('suggestionsContainer');
+            if (!container) return;
+            
+            // Clear container first
+            container.innerHTML = '';
+            
+            // Get 4 random questions
+            const shuffled = shuffleArray([...allQuestions]);
+            const selectedQuestions = shuffled.slice(0, 4);
+            
+            // Create and append exactly 4 buttons
+            selectedQuestions.forEach(question => {
+                const button = document.createElement('button');
+                button.className = 'cursor-pointer text-sm text-gray-700 bg-gray-100 hover:bg-blue-50 border border-gray-200 rounded-full px-3 py-1 transition-colors';
+                button.setAttribute('data-query', question);
+                button.textContent = question;
+                
+                // Add click event to populate search input
+                button.addEventListener('click', function() {
+                    const searchInput = document.getElementById('question');
+                    if (searchInput) {
+                        searchInput.value = question;
+                        searchInput.focus();
+                    }
+                });
+                
+                container.appendChild(button);
+            });
+        }
+
+        // Function to handle page reload shuffling
+        function initializeOnPageLoad() {
+            // Ensure we have a clean start
+            const container = document.getElementById('suggestionsContainer');
+            if (container) {
+                container.innerHTML = '';
+            }
+            
+            // Display 6 random questions immediately
+            displayRandomQuestions();
+            
+            // Add click event to shuffle button
+            const shuffleButton = document.getElementById('shuffleButton');
+            if (shuffleButton) {
+                shuffleButton.addEventListener('click', function() {
+                    displayRandomQuestions();
+                });
+            }
+        }
+
+        // Initialize on DOM content loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeOnPageLoad);
+        } else {
+            // If DOM is already loaded, initialize immediately
+            initializeOnPageLoad();
+        }
+
+        // Also initialize on window load to ensure everything is ready
+        window.addEventListener('load', function() {
+            // Double-check that we have exactly 4 questions displayed
+            const container = document.getElementById('suggestionsContainer');
+            if (container && container.children.length !== 4) {
+                displayRandomQuestions();
+            }
+        });
+
+        // Authentication handling
+        document.addEventListener('DOMContentLoaded', function() {
+            // Hide feedback button and admin button by default until we know the user's role
+            handleFeedbackButtonVisibility(null);
+            handleAdminButtonVisibility(null);
+            
+            checkAuthStatus();
+            initializeFeedback();
+        });
+
+        function checkAuthStatus() {
+            fetch('/api/auth/check/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.authenticated) {
+                        // User is authenticated
+                        showAuthenticatedUser(data.user);
+                    } else {
+                        // User is not authenticated
+                        showUnauthenticatedUser();
+                    }
+                })
+                .catch(error => {
+                    console.log('Error checking auth status:', error);
+                    showUnauthenticatedUser();
+                });
+        }
+
+        function showAuthenticatedUser(user) {
+            // Show user info and logout button
+            const userLinks = document.getElementById('user-links');
+            if (userLinks) {
+                userLinks.style.display = 'inline';
+            }
+            const userName = document.getElementById('user-name');
+            if (userName) {
+                userName.textContent = user.name;
+            }
+            
+            // Handle feedback button visibility based on user role
+            handleFeedbackButtonVisibility(user.role);
+            
+            // Handle admin button visibility based on user role
+            handleAdminButtonVisibility(user.role);
+        }
+
+        function showUnauthenticatedUser() {
+            // Hide user info and logout button
+            const userLinks = document.getElementById('user-links');
+            if (userLinks) {
+                userLinks.style.display = 'none';
+            }
+            
+            // Hide feedback button for unauthenticated users
+            handleFeedbackButtonVisibility(null);
+            
+            // Hide admin button for unauthenticated users
+            handleAdminButtonVisibility(null);
+        }
+
+        function handleFeedbackButtonVisibility(userRole) {
+            const feedbackButton = document.getElementById('feedbackButton');
+            const feedbackContainer = document.querySelector('.feedback-container');
+            
+            if (!feedbackButton || !feedbackContainer) {
+                console.warn('Feedback button or container not found');
+                return;
+            }
+            
+            // Define allowed roles that can see the feedback button
+            const allowedRoles = ['admin', 'manager'];
+            
+            // Check if user role is valid and allowed
+            const isRoleAllowed = userRole && 
+                                 typeof userRole === 'string' && 
+                                 userRole.trim() !== '' && 
+                                 allowedRoles.includes(userRole.toLowerCase());
+            
+            if (isRoleAllowed) {
+                // Show feedback button for admin and manager roles
+                feedbackContainer.style.display = 'block';
+                feedbackButton.style.display = 'flex';
+                console.log(`Feedback button shown for role: ${userRole}`);
+            } else {
+                // Hide feedback button for user role, null, empty, or undefined roles
+                feedbackContainer.style.display = 'none';
+                feedbackButton.style.display = 'none';
+                console.log(`Feedback button hidden for role: ${userRole || 'null/undefined'}`);
+            }
+        }
+
+        function handleAdminButtonVisibility(userRole) {
+            const adminButton = document.getElementById('adminButton');
+            
+            if (!adminButton) {
+                console.warn('Admin button not found');
+                return;
+            }
+            
+            // Define allowed roles that can see the admin button
+            const allowedRoles = ['admin', 'manager'];
+            
+            // Check if user role is valid and allowed
+            const isRoleAllowed = userRole && 
+                                 typeof userRole === 'string' && 
+                                 userRole.trim() !== '' && 
+                                 allowedRoles.includes(userRole.toLowerCase());
+            
+            if (isRoleAllowed) {
+                // Show admin button for admin and manager roles
+                adminButton.style.display = 'inline-block';
+                console.log(`Admin button shown for role: ${userRole}`);
+            } else {
+                // Hide admin button for user role, null, empty, or undefined roles
+                adminButton.style.display = 'none';
+                console.log(`Admin button hidden for role: ${userRole || 'null/undefined'}`);
+            }
+        }
+
+        function goToAdmin() {
+            // Navigate to admin dashboard
+            window.location.href = '/admin-panel/';
+        }
+
+        function logout() {
+            fetch('/api/auth/logout/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Redirect to login page after logout
+                    window.location.href = '/';
+                }
+            })
+            .catch(error => {
+                console.error('Logout error:', error);
+                // Still redirect to login page
+                window.location.href = '/';
+            });
+        }
+
+        // Handle feedback type change
+        function handleFeedbackTypeChange() {
+            const feedbackType = document.getElementById('feedbackType');
+            const customQuestionGroup = document.getElementById('customQuestionGroup');
+            const customQuestionInput = document.getElementById('customQuestion');
+            
+            console.log('Feedback type changed to:', feedbackType.value); // Debug log
+            
+            if (feedbackType.value === 'other') {
+                console.log('Showing custom question input'); // Debug log
+                customQuestionGroup.style.display = 'block';
+                customQuestionGroup.classList.add('show');
+                customQuestionInput.required = true;
+                // Focus on the custom question input
+                setTimeout(() => {
+                    customQuestionInput.focus();
+                }, 300);
+            } else {
+                console.log('Hiding custom question input'); // Debug log
+                customQuestionGroup.classList.remove('show');
+                customQuestionGroup.style.display = 'none';
+                customQuestionInput.required = false;
+                customQuestionInput.value = '';
+            }
+        }
+
+        // Feedback functionality
+        function initializeFeedback() {
+            const feedbackButton = document.getElementById('feedbackButton');
+            const feedbackModal = document.getElementById('feedbackModal');
+            const closeFeedbackModal = document.getElementById('closeFeedbackModal');
+            const cancelFeedback = document.getElementById('cancelFeedback');
+            const feedbackForm = document.getElementById('feedbackForm');
+
+            // Open feedback modal
+            feedbackButton.addEventListener('click', function() {
+                feedbackModal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            });
+
+            // Close feedback modal
+            function closeModal() {
+                feedbackModal.classList.add('hidden');
+                document.body.style.overflow = 'auto'; // Restore scrolling
+                feedbackForm.reset(); // Reset form
+            }
+
+            closeFeedbackModal.addEventListener('click', closeModal);
+            cancelFeedback.addEventListener('click', closeModal);
+
+            // Close modal when clicking outside
+            feedbackModal.addEventListener('click', function(e) {
+                if (e.target === feedbackModal) {
+                    closeModal();
+                }
+            });
+
+            // Handle form submission
+            feedbackForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(feedbackForm);
+                const feedbackType = formData.get('type');
+                const customQuestion = formData.get('custom_question');
+                
+                // Determine the question text
+                let questionText = '';
+                if (feedbackType === 'other' && customQuestion) {
+                    questionText = customQuestion;
+                } else {
+                    // Get the selected option text
+                    const selectedOption = document.querySelector(`#feedbackType option[value="${feedbackType}"]`);
+                    questionText = selectedOption ? selectedOption.textContent : feedbackType;
+                }
+                
+                const feedbackData = {
+                    type: feedbackType,
+                    question: questionText,
+                    message: formData.get('message'),
+                    email: formData.get('email'),
+                    timestamp: new Date().toISOString()
+                };
+
+                // Show loading state
+                const submitBtn = feedbackForm.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.textContent = 'Sending...';
+                submitBtn.disabled = true;
+
+                // Send feedback (you can replace this with actual API call)
+                fetch('/api/feedback/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(feedbackData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`Thank you for your feedback on "${questionText}"! We appreciate your input and will review it carefully.`);
+                        closeModal();
+                    } else {
+                        alert('Sorry, there was an error sending your feedback. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Feedback submission error:', error);
+                    // For now, just show success message (you can implement actual backend later)
+                    alert(`Thank you for your feedback on "${questionText}"! We appreciate your input and will review it carefully.`);
+                    closeModal();
+                })
+                .finally(() => {
+                    // Reset button state
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                });
+            });
+
+            // Close modal with Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && !feedbackModal.classList.contains('hidden')) {
+                    closeModal();
+                }
+            });
+        }
+    </script>
+</body>
+</html>

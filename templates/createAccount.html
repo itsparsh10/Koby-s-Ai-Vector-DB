@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Account</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      height: 100vh;
+      display: flex;
+    }
+
+    /* Left panel */
+    .left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 3rem 4rem;
+    }
+
+    .left h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .left p {
+      margin-bottom: 2rem;
+      color: #555;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.9rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 0.8rem 1rem;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 1rem;
+    }
+
+    .password-wrapper {
+      position: relative;
+    }
+
+    .password-wrapper input {
+      padding-right: 2.5rem;
+    }
+
+    .password-wrapper .toggle-password {
+      position: absolute;
+      right: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      font-size: 1.1rem;
+      color: #666;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 0.9rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .btn.signup {
+      background: #000;
+      color: #fff;
+      margin: 1.5rem 0;
+    }
+
+    .divider {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      position: relative;
+      font-size: 0.9rem;
+      color: #777;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 1px;
+      background: #ddd;
+    }
+
+    .divider::before {
+      left: 0;
+    }
+
+    .divider::after {
+      right: 0;
+    }
+
+    .btn.google {
+      border: 1px solid #ddd;
+      background: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn.google img {
+      width: 18px;
+    }
+
+    .signin-link {
+      text-align: center;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    .signin-link a {
+      color: #8b5cf6;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    /* Right panel with Deep Ocean Glow gradient */
+    .right {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(
+        135deg,
+        #000000 0%,
+        #00142E 15%,
+        #003366 35%,
+        #0055A4 55%,
+        #0077CC 70%,
+        #FCD9C0 85%,
+        #FFFFFF 100%
+      );
+      padding: 2rem;
+    }
+
+    .right img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 15px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      transition: transform 0.3s ease;
+    }
+
+    .right img:hover {
+      transform: scale(1.02);
+    }
+  </style>
+</head>
+<body>
+  <div class="left">
+    <h1>Create Account</h1>
+    <p>Join us and start your journey today</p>
+
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" placeholder="Enter your full name" />
+    </div>
+
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" placeholder="Enter your email address" />
+    </div>
+
+    <div class="form-group password-wrapper">
+      <label>Password</label>
+      <input type="password" placeholder="Enter your password" id="password"/>
+      <span class="toggle-password" onclick="togglePassword('password')">👁</span>
+    </div>
+
+    <div class="form-group password-wrapper">
+      <label>Confirm Password</label>
+      <input type="password" placeholder="Confirm your password" id="confirmPassword"/>
+      <span class="toggle-password" onclick="togglePassword('confirmPassword')">👁</span>
+    </div>
+
+    <button class="btn signup">Create Account</button>
+
+    <div class="divider">Or sign up with</div>
+
+    <button class="btn google">
+      <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google Logo"/> 
+      Continue with Google
+    </button>
+
+    <div class="signin-link">
+      Already have an account? <a href="/login/">Sign In</a>
+    </div>
+  </div>
+
+  <div class="right">
+  </div>
+
+  <script>
+    function togglePassword(id) {
+      const input = document.getElementById(id);
+      input.type = input.type === "password" ? "text" : "password";
+    }
+
+    // Check authentication status on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      checkAuthStatus();
+      
+      const form = document.querySelector('.left');
+      const nameInput = form.querySelector('input[type="text"]');
+      const emailInput = form.querySelector('input[type="email"]');
+      const passwordInput = document.getElementById('password');
+      const confirmPasswordInput = document.getElementById('confirmPassword');
+      const signupButton = document.querySelector('.btn.signup');
+      
+      // Add form submission handler
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        handleSignup();
+      });
+      
+      // Add click handler for signup button
+      signupButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        handleSignup();
+      });
+      
+      function checkAuthStatus() {
+        fetch('/api/auth/check/')
+          .then(response => response.json())
+          .then(data => {
+            if (data.success && data.authenticated) {
+              // User is already logged in, redirect to home
+              window.location.href = '/home/';
+            }
+          })
+          .catch(error => {
+            console.log('Not authenticated, showing signup form');
+          });
+      }
+      
+      function handleSignup() {
+        const name = nameInput.value.trim();
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+        
+        // Basic validation
+        if (!name) {
+          showMessage('Please enter your full name', 'error');
+          return;
+        }
+        
+        if (!email) {
+          showMessage('Please enter your email address', 'error');
+          return;
+        }
+        
+        if (!isValidEmail(email)) {
+          showMessage('Please enter a valid email address', 'error');
+          return;
+        }
+        
+        if (!password) {
+          showMessage('Please enter a password', 'error');
+          return;
+        }
+        
+        if (password.length < 6) {
+          showMessage('Password must be at least 6 characters long', 'error');
+          return;
+        }
+        
+        if (password !== confirmPassword) {
+          showMessage('Passwords do not match', 'error');
+          return;
+        }
+        
+        // Show loading state
+        signupButton.textContent = 'Creating Account...';
+        signupButton.disabled = true;
+        
+        // Make API call
+        fetch('/api/auth/register/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: name,
+            email: email,
+            password: password,
+            confirmPassword: confirmPassword
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            showMessage(data.message, 'success');
+            // Redirect to login page after successful account creation
+            setTimeout(() => {
+              window.location.href = '/login/';
+            }, 1000);
+          } else {
+            showMessage(data.message, 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          showMessage('An error occurred. Please try again.', 'error');
+        })
+        .finally(() => {
+          // Reset button state
+          signupButton.textContent = 'Create Account';
+          signupButton.disabled = false;
+        });
+      }
+      
+      function isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+      }
+      
+      function showMessage(message, type) {
+        // Remove existing message
+        const existingMessage = document.querySelector('.message');
+        if (existingMessage) {
+          existingMessage.remove();
+        }
+        
+        // Create new message
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+        messageDiv.textContent = message;
+        messageDiv.style.cssText = `
+          padding: 10px;
+          margin: 10px 0;
+          border-radius: 5px;
+          text-align: center;
+          font-weight: 500;
+          ${type === 'success' ? 'background: #d4edda; color: #155724; border: 1px solid #c3e6cb;' : 'background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;'}
+        `;
+        
+        // Insert message after the form
+        const formGroup = document.querySelector('.divider');
+        formGroup.parentNode.insertBefore(messageDiv, formGroup.nextSibling);
+        
+        // Auto-remove message after 5 seconds
+        setTimeout(() => {
+          if (messageDiv.parentNode) {
+            messageDiv.remove();
+          }
+        }, 5000);
+      }
+    });
+  </script>
+</body>
+</html>
