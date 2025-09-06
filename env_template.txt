@@ -1,0 +1,28 @@
+# Copy this file to .env and update the values
+
+# Django Settings
+DJANGO_SECRET_KEY=your-secret-key-here
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1,*
+
+# MongoDB Settings for User Storage
+MONGODB_HOST=localhost
+MONGODB_PORT=27017
+MONGODB_DB=pdf_qa_users
+MONGODB_USERNAME=
+MONGODB_PASSWORD=
+
+# Gemini AI Settings (optional)
+GEMINI_API_KEY=your-gemini-api-key-here
+
+# PDF Processing Settings
+PDF_DIRECTORY=pdfs
+INDEX_PATH=indexes/faiss_index.bin
+METADATA_PATH=indexes/metadata.json
+CHUNK_SIZE=1000
+CHUNK_OVERLAP=200
+EMBED_MODEL_NAME=all-MiniLM-L6-v2
+
+# Search Settings
+MAX_SEARCH_RESULTS=5
+SIMILARITY_THRESHOLD=0.3
