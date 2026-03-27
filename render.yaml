@@ -1,0 +1,45 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Deploy: Dashboard → New → Blueprint → paste this repo URL (or connect Git and select render.yaml).
+# After first deploy, set secrets in the web service: GEMINI_API_KEY, Supabase keys (see DEPLOY_RENDER.txt).
+#
+# Postgres below is created automatically; DATABASE_URL is injected from the database resource.
+
+databases:
+  - name: koby-postgres
+    databaseName: koby
+    user: koby
+    plan: basic-256mb
+
+services:
+  - type: web
+    name: koby-pdf-qa
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: standard
+    healthCheckPath: /api/health/
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: koby-postgres
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "false"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: GUNICORN_TIMEOUT
+        value: "120"
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: CSRF_COOKIE_SECURE
+        value: "true"
+      - key: SECURE_SSL_REDIRECT
+        value: "true"
+      - key: USE_X_FORWARDED_HOST
+        value: "true"
+      - key: DATABASE_SSL_REQUIRE
+        value: "true"
+      # Set in dashboard (Blueprint cannot store secrets): GEMINI_API_KEY, GEMINI_MODEL,
+      # NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_PDF_BUCKET

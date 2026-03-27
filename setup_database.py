@@ -2,7 +2,6 @@
 """
 Database Setup Script for PDF QA System
 This script helps initialize the database and create the first user.
-Supports both MongoDB and SQLite fallback.
 """
 
 import os
@@ -19,7 +18,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pdf_qa.settings')
 django.setup()
 
 try:
-    from core.models import User, MongoDBUser
+    from core.models import User
     print("✅ Models imported successfully")
 except Exception as e:
     print(f"❌ Error importing models: {e}")
@@ -56,13 +55,8 @@ def check_database_connection():
         # Try to count users
         user_count = User.objects.count()
         
-        # Check which model we're using
-        if isinstance(User, type(MongoDBUser)):
-            print(f"✅ MongoDB connection successful! Found {user_count} users.")
-            print("📊 Database: MongoDB")
-        else:
-            print(f"✅ SQLite connection successful! Found {user_count} users.")
-            print("📊 Database: SQLite")
+        print(f"✅ SQLite connection successful! Found {user_count} users.")
+        print("📊 Database: SQLite")
         
         return True
     except Exception as e:

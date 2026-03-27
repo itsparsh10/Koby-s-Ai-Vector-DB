@@ -1,0 +1,14 @@
+.venv
+__pycache__
+*.pyc
+.git
+.gitignore
+.env
+*.sqlite3
+.pytest_cache
+.mypy_cache
+.cursor
+*.md
+terminals
+staticfiles
+.DS_Store

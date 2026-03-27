@@ -6,7 +6,7 @@
 ![Django](https://img.shields.io/badge/Django-4.0+-green.svg)
 ![AI](https://img.shields.io/badge/AI-Powered-orange.svg)
 ![PDF](https://img.shields.io/badge/PDF-Processing-red.svg)
-![MongoDB](https://img.shields.io/badge/MongoDB-Database-green.svg)
+![Supabase](https://img.shields.io/badge/Supabase-Database%2BStorage-green.svg)
 ![FAISS](https://img.shields.io/badge/FAISS-Vector%20Search-purple.svg)
 
 **A comprehensive Django-based PDF Question-Answering system with AI-powered search, user authentication, admin dashboard, and collaborative knowledge enhancement.**
@@ -62,7 +62,7 @@
 ### **Backend Stack**
 - **Django 4.2+**: Web framework with REST API
 - **Django REST Framework**: API development
-- **SQLite/MongoDB**: Dual database support
+- **SQLite + Supabase**: Application DB with Supabase vector/search storage
 - **FAISS**: Vector similarity search
 - **Sentence Transformers**: Text embeddings
 - **Google Gemini AI**: Language model integration
@@ -139,6 +139,31 @@ python start_server.py
 
 ---
 
+## Supabase Setup
+
+1. Create a Supabase project and run `supabase_schema.sql` in SQL Editor.
+2. Enable extensions: `vector`, `pgcrypto`.
+3. Create Storage bucket `pdfs` (private).
+4. Set env vars:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `SUPABASE_PDF_BUCKET=pdfs`
+5. Use endpoints:
+   - `POST /api/admin/upload-signing/` (create signed upload URL)
+   - `POST /api/admin/upload-pdf/` (direct upload + documents row)
+   - `POST /api/admin/start-ingestion/` (chunk + embed + insert `document_chunks`)
+   - `POST /api/ask-supabase/` (RPC search via `match_document_chunks`)
+
+### Vercel Env Vars
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server only)
+- `GEMINI_API_KEY` (server only)
+
+---
+
 ## ⚙️ Configuration
 
 ### **Environment Variables (.env)**
@@ -163,12 +188,11 @@ GEMINI_API_KEY=your-gemini-api-key-here
    MAX_SEARCH_RESULTS=5
    SIMILARITY_THRESHOLD=0.3
 
-# MongoDB Configuration (Optional)
-MONGODB_HOST=localhost
-MONGODB_PORT=27017
-MONGODB_DB=pdf_qa_users
-MONGODB_USERNAME=
-MONGODB_PASSWORD=
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-or-publishable-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_PDF_BUCKET=pdfs
 ```
 
 ---
@@ -247,7 +271,7 @@ GET  /api/feedback/top-contributions/      # Top contributions
 │   ├── 📄 urls.py              # URL routing
 │   ├── 📄 utils.py             # Core utilities
 │   ├── 📄 enhanced_search.py   # Advanced search logic
-│   ├── 📄 mongodb_utils.py     # MongoDB integration
+│   ├── 📄 supabase_utils.py    # Supabase integration
 │   └── 📄 session_utils.py     # Session management
 ├── 📄 pdf_qa/                  # Django project settings
 │   ├── 📄 settings.py          # Configuration
@@ -268,7 +292,7 @@ GET  /api/feedback/top-contributions/      # Top contributions
 ## 🔧 Advanced Features
 
 ### **Enhanced Search System**
-- **Dual Search**: Combines FAISS vector search with MongoDB contributions
+- **Dual Search**: Combines FAISS vector search with Supabase contributions
 - **Smart Prioritization**: AI-powered result ranking
 - **Fallback Mechanisms**: Graceful degradation when services are unavailable
 - **Quality Assessment**: Automatic evaluation of search result quality
@@ -314,7 +338,7 @@ python manage.py embed_pdfs --force
 
 1. **Memory Usage**: Adjust batch size in PDF processing
 2. **Search Speed**: Tune similarity threshold
-3. **Database**: Use MongoDB for better performance with large datasets
+3. **Database**: Use Supabase Postgres + vector for large datasets
 4. **Caching**: Implement Redis for frequently accessed data
 
 ---

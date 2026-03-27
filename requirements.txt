@@ -1,6 +1,9 @@
 Django>=4.2
 djangorestframework
 django-cors-headers
+gunicorn>=22.0
+whitenoise>=6.6
+dj-database-url>=2.2
 PyPDF2
 sentence-transformers>=2.2.2
 faiss-cpu
@@ -10,5 +13,5 @@ openai
 python-dotenv
 Pillow
 google-generativeai
-mongoengine
-pymongo
+supabase
+psycopg2-binary

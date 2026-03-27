@@ -5,8 +5,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchButton = document.getElementById('searchButton');
     const voiceButton = document.getElementById('voiceButton');
     const imageButton = document.getElementById('imageButton');
-    const statusIndicator = document.getElementById('statusIndicator');
-    const statusText = document.getElementById('statusText');
     const resultsContent = document.getElementById('resultsContent');
     const samplePrompts = document.querySelectorAll('[data-prompt]');
 
@@ -78,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
     voiceButton.addEventListener('click', async () => {
         // Check authentication status before proceeding with voice search
         try {
-            const authResponse = await fetch('/api/auth/check/');
+            const authResponse = await fetch('/api/auth/check/', { credentials: 'same-origin' });
             const authData = await authResponse.json();
             
             if (!authData.success || !authData.authenticated) {
@@ -157,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function uploadAndSearchImage(file) {
         // Check authentication status before proceeding with image search
         try {
-            const authResponse = await fetch('/api/auth/check/');
+            const authResponse = await fetch('/api/auth/check/', { credentials: 'same-origin' });
             const authData = await authResponse.json();
             
             if (!authData.success || !authData.authenticated) {
@@ -221,6 +219,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const response = await fetch('/api/image-search/', {
                 method: 'POST',
+                credentials: 'same-origin',
                 body: formData
             });
             
@@ -249,8 +248,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Show image search result
     function showImageSearchResult(answer, imageDescription, sources, processingTime) {
-        statusIndicator.classList.add('hidden');
-        
         let imageDescriptionHtml = '';
         if (imageDescription) {
             imageDescriptionHtml = `
@@ -301,6 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch('/api/ask/', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -383,18 +381,12 @@ document.addEventListener('DOMContentLoaded', function() {
         searchButton.disabled = false;
         searchButton.classList.remove('loading');
         searchButton.innerHTML = '<i class="fas fa-search"></i>';
-        
-        // Ensure status indicator is hidden for text searches
-        statusIndicator.classList.add('hidden');
     }
 
     function showImageLoading() {
         imageButton.disabled = true;
         imageButton.classList.add('loading');
         imageButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        statusIndicator.classList.remove('hidden');
-        statusIndicator.className = 'status-indicator status-uploading';
-        statusText.textContent = 'Processing your image...';
         
         // Show results section
         const resultsSection = document.getElementById('resultsSection');
@@ -426,9 +418,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
      // Show answer
     function showAnswer(answer, sources, processingTime) {
-        // Hide status indicator for text search results
-        statusIndicator.classList.add('hidden');
-        
         // Ensure results section is visible
         const resultsSection = document.getElementById('resultsSection');
         if (resultsSection) {
@@ -447,9 +436,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Show error
     function showError(message) {
-        // Hide status indicator for errors
-        statusIndicator.classList.add('hidden');
-        
         // Show results section for errors
         const resultsSection = document.getElementById('resultsSection');
         if (resultsSection) {
@@ -506,15 +492,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Show voice indicator
     function showVoiceIndicator() {
-        statusIndicator.classList.remove('hidden');
-        statusIndicator.className = 'status-indicator status-recording';
-        statusText.textContent = 'Listening... Speak now';
+        /* Voice feedback: mic button state only (status strip removed) */
     }
 
-    // Hide voice indicator
     function hideVoiceIndicator() {
-        statusIndicator.classList.add('hidden');
-        statusIndicator.className = 'status-indicator hidden';
+        /* Voice feedback: mic button state only */
     }
 
     // Generate dynamic prompts based on available data

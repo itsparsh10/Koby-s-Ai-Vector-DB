@@ -10,10 +10,15 @@ import time
 from typing import Dict, Any, List, Optional
 import google.generativeai as genai
 from core.utils import search_similar_chunks
-from core.mongodb_utils import (
-    connect_to_mongodb, store_user_contribution, search_similar_contributions,
+from core.supabase_utils import (
+    store_user_contribution, search_similar_contributions,
     get_contribution_analytics, get_top_contributions, get_questions_and_answers,
-    get_top_rated_qa, get_recent_qa, search_qa_by_keyword
+    get_top_rated_qa, get_recent_qa, search_qa_by_keyword, create_signed_upload_url,
+    upload_pdf_and_create_document, ingest_document, match_document_chunks, list_contributions,
+    update_contribution_status,
+    sync_app_user_to_supabase,
+    log_auth_event_to_supabase,
+    log_user_search_to_supabase,
 )
 from core.enhanced_search import (
     enhanced_search_with_contributions, get_enhanced_sources, 
@@ -78,6 +83,39 @@ if gemini_api_key:
 else:
     logger.warning("Gemini API key not found. AI functionality will be limited.")
 
+
+def _session_identity(request) -> Dict[str, Optional[str]]:
+    return {
+        "django_user_id": request.session.get("user_id"),
+        "user_email": request.session.get("user_email"),
+        "user_name": request.session.get("user_name"),
+    }
+
+
+def _log_search_activity(
+    request,
+    question: str,
+    *,
+    response_preview: Optional[str] = None,
+    search_type: str = "text",
+    success: bool = True,
+    error_message: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    s = _session_identity(request)
+    log_user_search_to_supabase(
+        django_user_id=s.get("django_user_id"),
+        user_email=s.get("user_email"),
+        user_name=s.get("user_name"),
+        query_text=question,
+        response_preview=response_preview,
+        search_type=search_type,
+        success=success,
+        error_message=error_message,
+        metadata=metadata,
+    )
+
+
 def validate_request_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and sanitize request data."""
     errors = {}
@@ -92,12 +130,12 @@ def validate_request_data(data: Dict[str, Any]) -> Dict[str, Any]:
     
     return {'question': question, 'errors': errors}
 
-def _create_mongodb_only_context(contributions: List[Dict]) -> str:
+def _create_contribution_only_context(contributions: List[Dict]) -> str:
     """
-    Create context string from MongoDB contributions only
+    Create context string from user contributions only
     
     Args:
-        contributions: MongoDB search results
+        contributions: contribution search results
     
     Returns:
         Context string for AI processing
@@ -127,13 +165,21 @@ def generate_ai_response(question: str, context: str) -> Dict[str, Any]:
     """Generate AI response using Gemini."""
     try:
         if not gemini_api_key:
+            # Fallback for environments where Gemini key is not configured.
+            preview = context.strip()
+            if not preview:
+                preview = "No relevant context was found."
             return {
-                'success': False,
-                'error': 'AI service not configured',
-                'answer': None
+                'success': True,
+                'error': None,
+                'answer': (
+                    "AI model is not configured yet, so this is a direct context-based response.\n\n"
+                    f"Question: {question}\n\n"
+                    f"Relevant context:\n{preview[:1500]}"
+                )
             }
         
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel(settings.GEMINI_MODEL)
         prompt = f"""You are an AI assistant helping users with questions about barista training and coffee shop operations. Based on the following context from both original documents and user contributions, provide a comprehensive and accurate answer to the question.
 
 Question: {question}
@@ -197,7 +243,7 @@ def ask(request):
         question = validation_result['question']
         logger.info(f"Processing question: {question[:100]}...")
         
-        # Use enhanced search that combines FAISS and MongoDB with aggressive MongoDB search
+        # Use enhanced search that combines FAISS and contribution search.
         search_result = enhanced_search_with_contributions(
             question, 
             k=getattr(settings, 'MAX_SEARCH_RESULTS', 5),
@@ -208,6 +254,13 @@ def ask(request):
         
         if not search_result['success']:
             logger.error(f"Search error: {search_result['error']}")
+            _log_search_activity(
+                request,
+                question,
+                search_type="text",
+                success=False,
+                error_message=str(search_result.get("error", "search failed")),
+            )
             return Response({
                 'success': False,
                 'error': search_result['error'],
@@ -220,19 +273,26 @@ def ask(request):
         contribution_results = search_result.get('contribution_results', [])
         combined_context = search_result.get('combined_context', '')
         
-        # Check if we have any results - if not, try direct MongoDB search as fallback
+        # Check if we have any results - if not, run a direct contribution fallback search.
         if not faiss_chunks and not contribution_results:
-            logger.info("No results from enhanced search, trying direct MongoDB search as fallback")
+            logger.info("No results from enhanced search, trying direct contribution search as fallback")
             try:
-                from core.mongodb_utils import search_similar_contributions
+                from core.supabase_utils import search_similar_contributions
                 fallback_contributions = search_similar_contributions(question, limit=5, min_rating=0.0)
                 
                 if fallback_contributions:
-                    logger.info(f"Fallback MongoDB search found {len(fallback_contributions)} contributions")
+                    logger.info(f"Fallback contribution search found {len(fallback_contributions)} contributions")
                     contribution_results = fallback_contributions
-                    # Create context from MongoDB results only
-                    context = _create_mongodb_only_context(contribution_results)
+                    # Create context from contribution results only
+                    context = _create_contribution_only_context(contribution_results)
                 else:
+                    _log_search_activity(
+                        request,
+                        question,
+                        search_type="text",
+                        success=False,
+                        error_message="No relevant information found (no contributions fallback).",
+                    )
                     return Response({
                         'success': False,
                         'error': 'No relevant information found in the documents or user contributions. Try rephrasing your question.',
@@ -240,7 +300,14 @@ def ask(request):
                         'processing_time': round(time.time() - start_time, 3)
                     }, status=status.HTTP_404_NOT_FOUND)
             except Exception as e:
-                logger.error(f"Fallback MongoDB search failed: {e}")
+                logger.error(f"Fallback contribution search failed: {e}")
+                _log_search_activity(
+                    request,
+                    question,
+                    search_type="text",
+                    success=False,
+                    error_message=f"Fallback search failed: {e}",
+                )
                 return Response({
                     'success': False,
                     'error': 'No relevant information found in the documents or user contributions. Try rephrasing your question.',
@@ -256,6 +323,13 @@ def ask(request):
         
         if not ai_response['success']:
             logger.error(f"AI response error: {ai_response['error']}")
+            _log_search_activity(
+                request,
+                question,
+                search_type="text",
+                success=False,
+                error_message=str(ai_response.get("error", "AI error")),
+            )
             return Response({
                 'success': False,
                 'error': ai_response['error'],
@@ -285,6 +359,14 @@ def ask(request):
                     )
             except Exception as e:
                 logger.warning(f"Failed to track search activity: {str(e)}")
+
+        _log_search_activity(
+            request,
+            question,
+            response_preview=ai_response.get("answer"),
+            search_type="text",
+            success=True,
+        )
         
         return Response({
             'success': True,
@@ -308,20 +390,31 @@ def ask(request):
 
 @api_view(['GET'])
 def health_check(request):
-    """Health check endpoint to verify system status."""
+    """Health check endpoint to verify system status.
+
+    Does not load the FAISS index into memory (Render probes this path often).
+    """
     try:
-        from core.utils import load_index, load_metadata
-        
-        # Check if index and metadata are available
+        import os
+        import json
+
+        # File presence only — avoid faiss.read_index on every health probe
+        idx_path = getattr(settings, "INDEX_PATH", "indexes/faiss_index.bin")
+        meta_path = getattr(settings, "METADATA_PATH", "indexes/metadata.json")
+        index_status = "unavailable"
+        document_count = 0
         try:
-            index = load_index()
-            metadata = load_metadata()
-            index_status = 'available'
-            document_count = len(metadata) if metadata else 0
+            if os.path.exists(idx_path) and os.path.exists(meta_path):
+                index_status = "available"
+                with open(meta_path, encoding="utf-8") as f:
+                    meta = json.load(f)
+                document_count = len(meta) if isinstance(meta, list) else 0
+            elif os.path.exists(idx_path) or os.path.exists(meta_path):
+                index_status = "partial"
         except Exception as e:
-            index_status = 'unavailable'
+            index_status = "unavailable"
             document_count = 0
-            logger.warning(f"Index not available: {str(e)}")
+            logger.warning(f"Index metadata not readable: {str(e)}")
         
         # Check AI service
         ai_status = 'available' if gemini_api_key else 'unavailable'
@@ -441,6 +534,14 @@ def image_search(request):
             image_result = process_image_for_search(image_file)
             
             if not image_result['success']:
+                _log_search_activity(
+                    request,
+                    f"[image] {image_file.name}",
+                    search_type="image",
+                    success=False,
+                    error_message=str(image_result.get("error", "image analysis failed")),
+                    metadata={"filename": image_file.name},
+                )
                 return Response({
                     'success': False,
                     'error': image_result['error'],
@@ -459,6 +560,14 @@ def image_search(request):
             )
             
             if not search_result['success']:
+                _log_search_activity(
+                    request,
+                    search_query,
+                    search_type="image",
+                    success=False,
+                    error_message=str(search_result.get("error", "chunk search failed")),
+                    metadata={"filename": image_file.name},
+                )
                 return Response({
                     'success': False,
                     'error': search_result['error'],
@@ -467,9 +576,18 @@ def image_search(request):
             
             # Check if we found relevant context
             if not search_result['chunks']:
+                no_doc_msg = f'I analyzed the image and extracted: "{search_query}", but could not find relevant information in the available documents.'
+                _log_search_activity(
+                    request,
+                    search_query,
+                    response_preview=no_doc_msg,
+                    search_type="image",
+                    success=True,
+                    metadata={"filename": image_file.name, "note": "no_matching_chunks"},
+                )
                 return Response({
                     'success': True,
-                    'answer': f'I analyzed the image and extracted: "{search_query}", but could not find relevant information in the available documents.',
+                    'answer': no_doc_msg,
                     'image_description': search_query,
                     'sources': [],
                     'processing_time': round(time.time() - start_time, 3)
@@ -482,6 +600,14 @@ def image_search(request):
             ai_result = generate_ai_response_for_image(search_query, context)
             
             if not ai_result['success']:
+                _log_search_activity(
+                    request,
+                    search_query,
+                    search_type="image",
+                    success=False,
+                    error_message=str(ai_result.get("error", "AI error")),
+                    metadata={"filename": image_file.name},
+                )
                 return Response({
                     'success': False,
                     'error': ai_result['error'],
@@ -516,6 +642,15 @@ def image_search(request):
                 }
                 if source_info not in sources:
                     sources.append(source_info)
+
+            _log_search_activity(
+                request,
+                search_query,
+                response_preview=ai_result.get("answer"),
+                search_type="image",
+                success=True,
+                metadata={"filename": image_file.name},
+            )
             
             return Response({
                 'success': True,
@@ -563,7 +698,7 @@ def process_image_for_search(image_file) -> Dict[str, Any]:
         image = PIL.Image.open(io.BytesIO(image_data))
         
         # Use Gemini Vision to analyze the image
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel(settings.GEMINI_MODEL)
         prompt = """Analyze this image and provide a detailed description that could be used to search for related information in documents. Focus on:
 1. Any text visible in the image
 2. Objects, products, or items shown
@@ -605,7 +740,7 @@ def generate_ai_response_for_image(image_description: str, context: str) -> Dict
                 'answer': None
             }
         
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel(settings.GEMINI_MODEL)
         prompt = f"""Based on the image analysis and the following context from PDF documents, provide a comprehensive answer.
 
 Image Analysis: {image_description}
@@ -818,27 +953,23 @@ def admin_upload_pdf(request):
                 'error': 'File too large. Maximum size is 50MB.'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Save file to pdfs directory
-        import os
-        pdf_dir = os.path.join(settings.BASE_DIR, 'pdfs')
-        os.makedirs(pdf_dir, exist_ok=True)
-        
-        filename = pdf_file.name
-        file_path = os.path.join(pdf_dir, filename)
-        
-        with open(file_path, 'wb+') as destination:
-            for chunk in pdf_file.chunks():
-                destination.write(chunk)
-        
-        # Here you would call your PDF processing/indexing logic
-        # For now, we'll just return success
-        logger.info(f"PDF uploaded successfully: {filename}")
+        file_bytes = b"".join(chunk for chunk in pdf_file.chunks())
+        uploader = request.session.get("user_email", "")
+        user_id = request.session.get("user_id", "")
+        document = upload_pdf_and_create_document(
+            filename=pdf_file.name,
+            file_bytes=file_bytes,
+            uploader=uploader,
+            user_id=user_id,
+        )
+        logger.info(f"PDF uploaded to Supabase storage: {pdf_file.name}")
         
         return Response({
             'success': True,
-            'message': f'PDF "{filename}" uploaded successfully',
-            'filename': filename,
-            'size': pdf_file.size
+            'message': f'PDF "{pdf_file.name}" uploaded successfully',
+            'filename': pdf_file.name,
+            'size': pdf_file.size,
+            'document': document
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
@@ -954,56 +1085,14 @@ def admin_reindex_documents(request):
 def admin_list_contributions(request):
     """Admin endpoint for listing user contributions with filtering."""
     try:
-        from core.mongodb_utils import connect_to_mongodb
-        from core.feedback_models import UserContribution
-        
-        # Ensure MongoDB connection
-        connect_to_mongodb()
-        
         # Get query parameters
         status_filter = request.GET.get('status', 'all')  # all, pending, approved, rejected
         page = int(request.GET.get('page', 1))
         per_page = int(request.GET.get('per_page', 20))
         search_query = request.GET.get('search', '').lower()
-        
-        # Build query
-        query = {}
-        if status_filter != 'all':
-            query['is_approved'] = status_filter
-        
-        # Get contributions
-        if search_query:
-            # Search in question or answer
-            from mongoengine import Q
-            contributions = UserContribution.objects(
-                Q(**query) & (Q(question__icontains=search_query) | Q(answer__icontains=search_query))
-            ).order_by('-timestamp')
-        else:
-            contributions = UserContribution.objects(**query).order_by('-timestamp')
-        
-        # Pagination
-        total_count = contributions.count()
-        start_index = (page - 1) * per_page
-        end_index = start_index + per_page
-        page_contributions = contributions[start_index:end_index]
-        
-        # Convert to list of dictionaries
-        contributions_data = []
-        for contrib in page_contributions:
-            contributions_data.append({
-                'id': str(contrib.id),
-                'question': contrib.question,
-                'answer': contrib.answer,
-                'question_type': contrib.question_type,
-                'user_id': contrib.user_id,
-                'user_email': contrib.user_email,
-                'timestamp': contrib.timestamp.isoformat() if contrib.timestamp else None,
-                'rating': contrib.rating,
-                'usage_count': contrib.usage_count,
-                'improvement_type': contrib.improvement_type,
-                'is_approved': contrib.is_approved,
-                'similarity_keywords': contrib.similarity_keywords
-            })
+        response = list_contributions(status_filter, page, per_page, search_query)
+        contributions_data = response["items"]
+        total_count = response["total_count"]
         
         return Response({
             'success': True,
@@ -1031,9 +1120,6 @@ def admin_list_contributions(request):
 def admin_approve_contribution(request):
     """Admin endpoint for approving a user contribution."""
     try:
-        from core.mongodb_utils import connect_to_mongodb
-        from core.feedback_models import UserContribution
-        
         data = request.data
         contribution_id = data.get('contribution_id')
         action = data.get('action')  # 'approve' or 'reject'
@@ -1050,20 +1136,12 @@ def admin_approve_contribution(request):
                 'error': 'action must be either "approve" or "reject"'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Ensure MongoDB connection
-        connect_to_mongodb()
-        
-        # Find and update contribution
-        contribution = UserContribution.objects(id=contribution_id).first()
-        if not contribution:
+        result = update_contribution_status(contribution_id, action)
+        if not result["success"]:
             return Response({
                 'success': False,
-                'error': 'Contribution not found'
+                'error': result["error"]
             }, status=status.HTTP_404_NOT_FOUND)
-        
-        # Update approval status
-        contribution.is_approved = "approved" if action == "approve" else "rejected"
-        contribution.save()
         
         logger.info(f"Contribution {contribution_id} {action}d by admin")
         
@@ -1071,7 +1149,7 @@ def admin_approve_contribution(request):
             'success': True,
             'message': f'Contribution {action}d successfully',
             'contribution_id': contribution_id,
-            'new_status': contribution.is_approved
+            'new_status': result["new_status"]
         })
         
     except Exception as e:
@@ -1085,9 +1163,6 @@ def admin_approve_contribution(request):
 def admin_bulk_approve_contributions(request):
     """Admin endpoint for bulk approving/rejecting multiple contributions."""
     try:
-        from core.mongodb_utils import connect_to_mongodb
-        from core.feedback_models import UserContribution
-        
         data = request.data
         contribution_ids = data.get('contribution_ids', [])
         action = data.get('action')  # 'approve' or 'reject'
@@ -1104,14 +1179,11 @@ def admin_bulk_approve_contributions(request):
                 'error': 'action must be either "approve" or "reject"'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Ensure MongoDB connection
-        connect_to_mongodb()
-        
-        # Update multiple contributions
-        new_status = "approved" if action == "approve" else "rejected"
-        updated_count = UserContribution.objects(id__in=contribution_ids).update(
-            set__is_approved=new_status
-        )
+        updated_count = 0
+        for contribution_id in contribution_ids:
+            result = update_contribution_status(contribution_id, action)
+            if result["success"]:
+                updated_count += 1
         
         logger.info(f"Bulk {action}d {updated_count} contributions by admin")
         
@@ -1133,7 +1205,7 @@ def admin_bulk_approve_contributions(request):
 def admin_approve_all_pending(request):
     """Admin endpoint to approve all pending contributions (one-time fix)."""
     try:
-        from core.mongodb_utils import approve_all_pending_contributions
+        from core.supabase_utils import approve_all_pending_contributions
         
         result = approve_all_pending_contributions()
         
@@ -1157,6 +1229,83 @@ def admin_approve_all_pending(request):
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+@api_view(['POST'])
+def create_upload_signing(request):
+    """Create a signed Supabase upload URL for a PDF."""
+    filename = request.data.get("filename")
+    if not filename:
+        return Response({"success": False, "error": "filename is required"}, status=status.HTTP_400_BAD_REQUEST)
+    user_id = request.session.get("user_id", "")
+    data = create_signed_upload_url(filename=filename, user_id=user_id)
+    return Response({"success": True, **data}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def start_ingestion(request):
+    """Trigger document ingestion and embedding into Supabase document_chunks."""
+    document_id = request.data.get("document_id")
+    if not document_id:
+        return Response({"success": False, "error": "document_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+    result = ingest_document(document_id)
+    return Response(result, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def ask_supabase(request):
+    """Ask endpoint that uses Supabase vector search function match_document_chunks."""
+    question = request.data.get("question", "").strip()
+    if not question:
+        return Response({"success": False, "error": "question is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    chunks = match_document_chunks(question, k=getattr(settings, 'MAX_SEARCH_RESULTS', 5))
+    if not chunks:
+        _log_search_activity(
+            request,
+            question,
+            search_type="supabase",
+            success=False,
+            error_message="No relevant chunks found",
+        )
+        return Response({"success": False, "error": "No relevant chunks found", "answer": None}, status=status.HTTP_404_NOT_FOUND)
+
+    context = "\n\n".join([chunk.get("text", "") for chunk in chunks])
+    ai_response = generate_ai_response(question, context)
+    if not ai_response["success"]:
+        _log_search_activity(
+            request,
+            question,
+            search_type="supabase",
+            success=False,
+            error_message=str(ai_response.get("error", "AI error")),
+        )
+        return Response({"success": False, "error": ai_response["error"], "answer": None}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    _log_search_activity(
+        request,
+        question,
+        response_preview=ai_response.get("answer"),
+        search_type="supabase",
+        success=True,
+    )
+
+    return Response(
+        {
+            "success": True,
+            "answer": ai_response["answer"],
+            "sources": [
+                {
+                    "document_id": chunk.get("document_id"),
+                    "page_number": chunk.get("page_number"),
+                    "chunk_index": chunk.get("chunk_index"),
+                    "similarity": chunk.get("similarity"),
+                }
+                for chunk in chunks
+            ],
+        },
+        status=status.HTTP_200_OK,
+    )
+
 # User Authentication Views
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -1179,7 +1328,7 @@ def user_login(request):
                 }, status=400)
             
             try:
-                # Use filter().first() instead of get() for MongoDB compatibility
+                # Use filter().first() for tolerant lookup behavior.
                 user = User.objects.filter(email=email).first()
                 if user and user.check_password(password):
                     # Store user info in session
@@ -1190,6 +1339,12 @@ def user_login(request):
                     # Track user login activity if available
                     if SESSION_TRACKING_AVAILABLE:
                         track_user_login(request, user)
+
+                    role = getattr(user, "role", "user")
+                    sync_app_user_to_supabase(
+                        str(user.id), user.email, user.name, role, set_last_login=True
+                    )
+                    log_auth_event_to_supabase(str(user.id), user.email, "login")
                     
                     return JsonResponse({
                         'success': True,
@@ -1281,6 +1436,12 @@ def user_create_account(request):
             request.session['user_id'] = str(user.id)  # Convert ObjectId to string
             request.session['user_email'] = user.email
             request.session['user_name'] = user.name
+
+            role = getattr(user, "role", "user")
+            sync_app_user_to_supabase(
+                str(user.id), user.email, user.name, role, set_last_login=True
+            )
+            log_auth_event_to_supabase(str(user.id), user.email, "register")
             
             return JsonResponse({
                 'success': True,
@@ -1315,6 +1476,9 @@ def user_logout(request):
     try:
         # Get user ID before clearing session
         user_id = request.session.get('user_id')
+        user_email = request.session.get("user_email")
+        if user_id and user_email:
+            log_auth_event_to_supabase(str(user_id), user_email, "logout")
         
         # Track user logout activity if available
         if SESSION_TRACKING_AVAILABLE and user_id:
@@ -1342,7 +1506,7 @@ def check_auth(request):
         
         if user_id:
             try:
-                # Use filter().first() for MongoDB compatibility
+                # Use filter().first() for tolerant lookup behavior.
                 user = User.objects.filter(id=user_id).first()
                 if user:
                     print(f"Auth check successful for user: {user.name}")
@@ -1447,10 +1611,9 @@ def get_admin_dashboard_stats(request):
         except Exception:
             today_logins = 0
         
-        # Get pending questions count from UserContribution model
+        # Get pending questions count from feedback table
         try:
-            from .feedback_models import UserContribution
-            pending_questions = UserContribution.objects.filter(is_approved='pending').count()
+            pending_questions = list_contributions(status_filter="pending", page=1, per_page=1).get("total_count", 0)
         except Exception:
             pending_questions = 0
         
@@ -1562,27 +1725,11 @@ def get_user_sessions(request):
             query['is_active'] = status_filter
         
         if search_query:
-            # Search in user name or email - handle both MongoDB and Django
-            try:
-                # Try MongoDB first
-                from mongoengine import Q
-                search_filter = Q(user_name__icontains=search_query) | Q(user_email__icontains=search_query)
-                
-                # Apply status filter if specified
-                if status_filter != 'all':
-                    search_filter = search_filter & Q(is_active=status_filter)
-                
-                sessions = UserSession.objects.filter(search_filter).order_by('-login_time')
-            except ImportError:
-                # Fallback to Django Q
-                from django.db.models import Q
-                search_filter = Q(user_name__icontains=search_query) | Q(user_email__icontains=search_query)
-                
-                # Apply status filter if specified
-                if status_filter != 'all':
-                    search_filter = search_filter & Q(is_active=status_filter)
-                
-                sessions = UserSession.objects.filter(search_filter).order_by('-login_time')
+            from django.db.models import Q
+            search_filter = Q(user_name__icontains=search_query) | Q(user_email__icontains=search_query)
+            if status_filter != 'all':
+                search_filter = search_filter & Q(is_active=status_filter)
+            sessions = UserSession.objects.filter(search_filter).order_by('-login_time')
         else:
             sessions = UserSession.objects.filter(**query).order_by('-login_time')
         
@@ -1776,7 +1923,7 @@ def create_user_with_role(request):
 @api_view(['POST'])
 @parser_classes([JSONParser])
 def submit_feedback(request):
-    """Handle user feedback and store in MongoDB for knowledge enhancement"""
+    """Handle user feedback and store in Supabase for knowledge enhancement."""
     start_time = time.time()
     
     try:
@@ -1804,7 +1951,7 @@ def submit_feedback(request):
             'improvement_type': data.get('improvement_type', 'enhancement')
         }
         
-        # Store in MongoDB
+        # Store in Supabase
         result = store_user_contribution(contribution_data)
         
         if result['success']:

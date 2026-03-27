@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Simple test to verify the dual search system fixes
-"""
+"""Simple test to verify contribution + FAISS search pipeline."""
 
 import os
 import sys
@@ -19,35 +17,34 @@ def test_imports():
     print("Testing imports...")
     try:
         from core.enhanced_search import enhanced_search_with_contributions
-        from core.mongodb_utils import search_similar_contributions, connect_to_mongodb
-        from core.feedback_models import UserContribution
+        from core.supabase_utils import search_similar_contributions, connect_supabase
         print("✅ All imports successful")
         return True
     except Exception as e:
         print(f"❌ Import error: {e}")
         return False
 
-def test_mongodb_connection():
-    """Test MongoDB connection"""
-    print("Testing MongoDB connection...")
+def test_supabase_connection():
+    """Test Supabase connection."""
+    print("Testing Supabase connection...")
     try:
-        from core.mongodb_utils import connect_to_mongodb
-        success = connect_to_mongodb()
+        from core.supabase_utils import connect_supabase
+        success = connect_supabase()
         if success:
-            print("✅ MongoDB connection successful")
+            print("✅ Supabase connection successful")
             return True
         else:
-            print("❌ MongoDB connection failed")
+            print("❌ Supabase connection failed")
             return False
     except Exception as e:
-        print(f"❌ MongoDB connection error: {e}")
+        print(f"❌ Supabase connection error: {e}")
         return False
 
 def test_contribution_search():
-    """Test MongoDB contribution search"""
+    """Test contribution search."""
     print("Testing contribution search...")
     try:
-        from core.mongodb_utils import search_similar_contributions
+        from core.supabase_utils import search_similar_contributions
         results = search_similar_contributions("How to handle customer complaints?", limit=3)
         print(f"✅ Found {len(results)} contributions")
         return True
@@ -85,7 +82,7 @@ def main():
     
     tests = [
         test_imports,
-        test_mongodb_connection,
+        test_supabase_connection,
         test_contribution_search,
         test_enhanced_search
     ]

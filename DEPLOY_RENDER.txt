@@ -1,0 +1,121 @@
+================================================================================
+Deploy on Render — full checklist (use in order)
+================================================================================
+
+WHAT THIS APP IS
+  - Django 5 + Gunicorn + WhiteNoise (Dockerfile).
+  - Heavy Python ML stack: sentence-transformers, FAISS, PyTorch (large image,
+    long first build — often 15–25+ minutes).
+  - Sessions + auth use the database when DATABASE_URL is set (use Postgres on
+    Render; SQLite on the container disk is wiped on redeploy).
+  - Vector/RAG data lives in Supabase (Postgres + pgvector + Storage). Run
+    supabase_schema.sql in the Supabase SQL Editor once per project.
+  - Gemini powers Q&A; set GEMINI_API_KEY or AI features stay limited.
+
+--------------------------------------------------------------------------------
+1) SUPABASE (before Render)
+--------------------------------------------------------------------------------
+  - Create project → Settings → API: copy Project URL and anon + service_role keys.
+  - Storage: create bucket name matching SUPABASE_PDF_BUCKET (default: pdfs).
+  - SQL Editor: run the full supabase_schema.sql from this repo (extensions,
+    tables, RLS, match_document_chunks RPC).
+
+--------------------------------------------------------------------------------
+2) GOOGLE AI (GEMINI)
+--------------------------------------------------------------------------------
+  - Get an API key from Google AI Studio; set GEMINI_API_KEY on the web service.
+  - Optional: GEMINI_MODEL (default in code: gemini-2.5-flash-lite).
+
+--------------------------------------------------------------------------------
+3) GIT + RENDER ACCOUNT
+--------------------------------------------------------------------------------
+  - Push this repo to GitHub/GitLab/Bitbucket (no secrets in the repo — use
+    .gitignore; never commit .env).
+  - Sign in at render.com and connect the Git provider.
+
+--------------------------------------------------------------------------------
+4) DEPLOY OPTIONS
+--------------------------------------------------------------------------------
+  A) Blueprint (recommended if starting fresh)
+     - New → Blueprint → select repo → Render reads render.yaml.
+     - That file creates: PostgreSQL (koby-postgres) + web service (Docker),
+       wires DATABASE_URL, sets safe production flags.
+     - After deploy: open the web service → Environment → add the secrets
+       Render cannot store in YAML:
+         GEMINI_API_KEY
+         GEMINI_MODEL                    (optional)
+         NEXT_PUBLIC_SUPABASE_URL
+         NEXT_PUBLIC_SUPABASE_ANON_KEY
+         SUPABASE_SERVICE_ROLE_KEY
+         SUPABASE_PDF_BUCKET             (default pdfs)
+
+  B) Manual
+     - New → PostgreSQL → note the Internal Database URL.
+     - New → Web Service → Docker → Dockerfile path: Dockerfile
+     - Health check path: /api/health/
+     - Instance: at least Standard (2 GB RAM) for ML; Starter may OOM.
+     - Set DATABASE_URL to the Postgres URL plus all variables in section 5.
+
+  If you ALREADY have a Render Postgres instance: remove the `databases:` block
+  from render.yaml (or do not use that Blueprint section) and set DATABASE_URL
+  by hand on the web service.
+
+--------------------------------------------------------------------------------
+5) ENVIRONMENT VARIABLES (web service)
+--------------------------------------------------------------------------------
+  Required for production behavior:
+    DATABASE_URL              = (from Render Postgres; auto if using Blueprint DB)
+    DJANGO_SECRET_KEY         = long random string (Blueprint can generate)
+    DEBUG                     = false
+    GEMINI_API_KEY            = your key
+    NEXT_PUBLIC_SUPABASE_URL
+    NEXT_PUBLIC_SUPABASE_ANON_KEY
+    SUPABASE_SERVICE_ROLE_KEY
+    SUPABASE_PDF_BUCKET       = pdfs
+
+  Usually automatic on Render (do not override unless debugging):
+    RENDER_EXTERNAL_URL
+    RENDER_EXTERNAL_HOSTNAME
+
+  Security (already in render.yaml / settings defaults):
+    SESSION_COOKIE_SECURE=true   CSRF_COOKIE_SECURE=true   SECURE_SSL_REDIRECT=true
+    USE_X_FORWARDED_HOST=true    DATABASE_SSL_REQUIRE=true
+
+  Optional tuning:
+    WEB_CONCURRENCY=1            (if workers are OOM-killed; default 2)
+    GUNICORN_TIMEOUT=120
+    GUNICORN_MAX_REQUESTS=500
+    ALLOWED_HOSTS                (comma-separated; .onrender.com is allowed by default)
+    CSRF_TRUSTED_ORIGINS         (for custom domain: https://your-domain.com)
+    CORS_ALLOWED_ORIGINS         (if browser calls API from another origin)
+
+--------------------------------------------------------------------------------
+6) FIRST DEPLOY EXPECTATIONS
+--------------------------------------------------------------------------------
+  - Docker build is slow (ML dependencies).
+  - Entrypoint: migrate (retries) → Gunicorn on PORT.
+  - If migrate fails: check DATABASE_URL, Postgres status, same region as web.
+
+--------------------------------------------------------------------------------
+7) AFTER DEPLOY
+--------------------------------------------------------------------------------
+  - Open https://<service>.onrender.com/login/
+  - FAISS files: include indexes/ + pdfs/ in the repo/image, or build index on
+    the instance (heavy). Supabase ingestion path does not require local FAISS
+    if you only use Supabase vector search.
+  - Health: GET /api/health/ returns 200 without loading the full FAISS index
+    into RAM (safe for Render probes).
+
+--------------------------------------------------------------------------------
+8) TROUBLESHOOTING
+--------------------------------------------------------------------------------
+  400 Bad Request (CSRF): add your exact https URL to CSRF_TRUSTED_ORIGINS;
+    settings also append RENDER_EXTERNAL_URL when set.
+  DisallowedHost: add host to ALLOWED_HOSTS (custom domain).
+  OOM / worker killed: WEB_CONCURRENCY=1 or upgrade RAM.
+  Supabase errors: confirm schema SQL ran; SUPABASE_SERVICE_ROLE_KEY correct;
+    bucket exists.
+  Gemini quota: change GEMINI_MODEL or enable billing on Google AI.
+  Cold start: free/starter tiers sleep; first request after idle can be slow.
+
+================================================================================

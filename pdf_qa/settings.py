@@ -15,9 +15,14 @@ import os
 import sys
 from dotenv import load_dotenv
 
-load_dotenv()
-
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
+
+
+def _to_bool(value: str, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 # Security Configuration
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
@@ -28,14 +33,23 @@ if not SECRET_KEY:
         print("ERROR: DJANGO_SECRET_KEY environment variable is required in production")
         sys.exit(1)
 
-DEBUG = os.getenv("DEBUG", "True").lower() == "true"
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,*").split(",")
+DEBUG = _to_bool(os.getenv("DEBUG"), default=True)
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+# Common PaaS host suffixes (subdomain matching). Set ALLOWED_HOSTS in .env for your exact domain.
+for _suffix in (".onrender.com", ".railway.app", ".vercel.app", ".fly.dev"):
+    if _suffix not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_suffix)
+
+USE_X_FORWARDED_HOST = _to_bool(os.getenv("USE_X_FORWARDED_HOST"), default=True)
 
 # API Keys Validation
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     print("WARNING: GEMINI_API_KEY not found in environment variables")
     print("The AI Q&A functionality will not work without a valid API key")
+
+# Model id for google.generativeai (e.g. gemini-2.5-flash-lite, gemini-2.0-flash). Override if quota differs by plan.
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
 
 # PDF Processing Configuration
 PDF_DIRECTORY = os.getenv("PDF_DIRECTORY", "pdfs")
@@ -64,6 +78,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -93,20 +108,29 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "pdf_qa.wsgi.application"
 
-# Database Configuration
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
+# Database Configuration (set DATABASE_URL for Postgres on Render/Railway/etc.)
+import dj_database_url
 
-# MongoDB Configuration for User model
-MONGODB_HOST = os.getenv("MONGODB_HOST", "localhost")
-MONGODB_PORT = int(os.getenv("MONGODB_PORT", "27017"))
-MONGODB_DB = os.getenv("MONGODB_DB", "pdf_qa_users")
-MONGODB_USERNAME = os.getenv("MONGODB_USERNAME", "")
-MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD", "")
+if os.getenv("DATABASE_URL"):
+    DATABASES = {
+        "default": dj_database_url.config(
+            conn_max_age=600,
+            ssl_require=_to_bool(os.getenv("DATABASE_SSL_REQUIRE"), default=True),
+        )
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+
+# Supabase configuration for vector + storage flows
+NEXT_PUBLIC_SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL", "")
+NEXT_PUBLIC_SUPABASE_ANON_KEY = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_PDF_BUCKET = os.getenv("SUPABASE_PDF_BUCKET", "pdfs")
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -133,14 +157,28 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+if not DEBUG:
+    STORAGES = {
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+        },
+    }
 
 # Session Configuration
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_AGE = 86400  # 24 hours in seconds
-SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_SECURE = _to_bool(os.getenv("SESSION_COOKIE_SECURE"), default=not DEBUG)
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_SAVE_EVERY_REQUEST = True
+CSRF_COOKIE_SECURE = _to_bool(os.getenv("CSRF_COOKIE_SECURE"), default=not DEBUG)
+SECURE_SSL_REDIRECT = _to_bool(os.getenv("SECURE_SSL_REDIRECT"), default=not DEBUG)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0" if DEBUG else "31536000"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _to_bool(os.getenv("SECURE_HSTS_INCLUDE_SUBDOMAINS"), default=not DEBUG)
+SECURE_HSTS_PRELOAD = _to_bool(os.getenv("SECURE_HSTS_PRELOAD"), default=not DEBUG)
 
 # Additional session settings for better compatibility
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
@@ -150,10 +188,40 @@ SESSION_COOKIE_NAME = 'sessionid'
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = True  # For development only - remove in production
+CORS_ALLOW_ALL_ORIGINS = _to_bool(os.getenv("CORS_ALLOW_ALL_ORIGINS"), default=DEBUG)
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "http://localhost:3000",  # If using React/Next.js
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000",
+    ).split(",")
+    if origin.strip()
 ]
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        "http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000",
+    ).split(",")
+    if origin.strip()
+]
+
+# Render.com (and similar): trust the public HTTPS URL for CSRF / admin / forms
+_render_url = os.getenv("RENDER_EXTERNAL_URL", "").strip().rstrip("/")
+if _render_url:
+    if _render_url not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_render_url)
+    if _render_url not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(_render_url)
+
+_render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
+if _render_host and _render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_render_host)
+
+# Production: SQLite on ephemeral disk is lost on redeploy — use Render Postgres (DATABASE_URL)
+if not DEBUG and not os.getenv("DATABASE_URL"):
+    print(
+        "WARNING: DEBUG is False but DATABASE_URL is not set. "
+        "Use Render PostgreSQL and set DATABASE_URL, or data will not persist reliably."
+    )

@@ -7,8 +7,9 @@ from core.views import (
     user_login, user_create_account, user_logout, check_auth, get_live_user_count, 
     get_user_stats, get_user_activity, get_user_sessions, terminate_user_session, 
     cleanup_old_sessions, get_admin_dashboard_stats, submit_feedback, get_feedback_analytics, 
-    get_top_contributions_api, get_questions_and_answers_api, get_top_rated_qa_api, 
-    get_recent_qa_api, search_qa_api, create_user_with_role
+    get_top_contributions_api, get_questions_and_answers_api, get_top_rated_qa_api,
+    get_recent_qa_api, search_qa_api, create_user_with_role, create_upload_signing,
+    start_ingestion, ask_supabase
 )
 
 urlpatterns = [
@@ -39,6 +40,8 @@ urlpatterns = [
     # Admin endpoints
     path("admin/dashboard-stats/", admin_dashboard_stats, name="admin_dashboard_stats"),
     path("admin/upload-pdf/", admin_upload_pdf, name="admin_upload_pdf"),
+    path("admin/upload-signing/", create_upload_signing, name="create_upload_signing"),
+    path("admin/start-ingestion/", start_ingestion, name="start_ingestion"),
     path("admin/create-user/", admin_create_user, name="admin_create_user"),
     path("admin/list-users/", admin_list_users, name="admin_list_users"),
     path("admin/reindex-documents/", admin_reindex_documents, name="admin_reindex_documents"),
@@ -59,4 +62,5 @@ urlpatterns = [
     path("feedback/top-rated-qa/", get_top_rated_qa_api, name="get_top_rated_qa"),
     path("feedback/recent-qa/", get_recent_qa_api, name="get_recent_qa"),
     path("feedback/search-qa/", search_qa_api, name="search_qa"),
+    path("ask-supabase/", ask_supabase, name="ask_supabase"),
 ]

@@ -1,6 +1,6 @@
 """
 Enhanced Search Module
-This module provides dual search functionality combining FAISS index and MongoDB user contributions
+This module provides dual search functionality combining FAISS index and user contributions.
 """
 
 import logging
@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 
 from .utils import search_similar_chunks
-from .mongodb_utils import search_similar_contributions, connect_to_mongodb
+from .supabase_utils import search_similar_contributions
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +21,8 @@ def enhanced_search_with_contributions(
     contribution_limit: int = 5
 ) -> Dict[str, Any]:
     """
-    Enhanced search that combines FAISS index results with MongoDB user contributions
-    Implements fallback mechanism: if FAISS results are poor, prioritize MongoDB results
+    Enhanced search that combines FAISS index results with user contributions.
+    Implements fallback mechanism: if FAISS results are poor, prioritize contribution results.
     
     Args:
         query: Search query
@@ -41,11 +41,11 @@ def enhanced_search_with_contributions(
         faiss_result = search_similar_chunks(query, k, similarity_threshold)
         faiss_chunks = faiss_result.get('chunks', []) if faiss_result['success'] else []
         
-        # Step 2: Search MongoDB contributions (ALWAYS search, regardless of FAISS results)
+        # Step 2: Search contributions (always search, regardless of FAISS results)
         contribution_results = []
         if include_contributions:
             try:
-                logger.info(f"Searching MongoDB contributions for query: '{query}'")
+                logger.info(f"Searching contributions for query: '{query}'")
                 contribution_results = search_similar_contributions(
                     query, 
                     limit=contribution_limit,
@@ -61,17 +61,16 @@ def enhanced_search_with_contributions(
                 logger.error(f"Failed to search contributions: {e}")
                 contribution_results = []
         
-        # Step 3: Determine if we should prioritize MongoDB results
+        # Step 3: Determine if we should prioritize contribution results.
         faiss_quality = _assess_faiss_quality(faiss_chunks, query)
-        mongodb_quality = _assess_mongodb_quality(contribution_results, query)
+        contribution_quality = _assess_contribution_quality(contribution_results, query)
         
-        logger.info(f"FAISS quality: {faiss_quality}, MongoDB quality: {mongodb_quality}")
+        logger.info(f"FAISS quality: {faiss_quality}, contribution quality: {contribution_quality}")
         
         # Step 4: Create combined context with proper prioritization
-        if mongodb_quality > faiss_quality and contribution_results:
-            # MongoDB has better results, prioritize them
-            logger.info("Prioritizing MongoDB results over FAISS")
-            combined_context = _create_prioritized_context(contribution_results, faiss_chunks, prioritize_mongodb=True)
+        if contribution_quality > faiss_quality and contribution_results:
+            logger.info("Prioritizing contribution results over FAISS")
+            combined_context = _create_prioritized_context(contribution_results, faiss_chunks, prioritize_contributions=True)
         else:
             # Use standard combination
             combined_context = _create_combined_context(faiss_chunks, contribution_results)
@@ -84,8 +83,8 @@ def enhanced_search_with_contributions(
             'has_contributions': len(contribution_results) > 0,
             'total_sources': len(faiss_chunks) + len(contribution_results),
             'faiss_quality': faiss_quality,
-            'mongodb_quality': mongodb_quality,
-            'prioritized_mongodb': mongodb_quality > faiss_quality and contribution_results
+            'contribution_quality': contribution_quality,
+            'prioritized_contributions': contribution_quality > faiss_quality and contribution_results
         }
         
         logger.info(f"Enhanced search completed: {search_metadata['faiss_count']} FAISS + {search_metadata['contribution_count']} contributions")
@@ -121,7 +120,7 @@ def _create_combined_context(faiss_chunks: List[Dict], contributions: List[Dict]
     
     Args:
         faiss_chunks: Results from FAISS search
-        contributions: Results from MongoDB search
+        contributions: Results from contribution search
     
     Returns:
         Combined context string
@@ -195,12 +194,12 @@ def _assess_faiss_quality(faiss_chunks: List[Dict], query: str) -> float:
     return quality
 
 
-def _assess_mongodb_quality(contributions: List[Dict], query: str) -> float:
+def _assess_contribution_quality(contributions: List[Dict], query: str) -> float:
     """
-    Assess the quality of MongoDB search results
+    Assess the quality of contribution search results.
     
     Args:
-        contributions: MongoDB search results
+        contributions: contribution search results
         query: Original search query
     
     Returns:
@@ -227,22 +226,22 @@ def _assess_mongodb_quality(contributions: List[Dict], query: str) -> float:
     return quality
 
 
-def _create_prioritized_context(contributions: List[Dict], faiss_chunks: List[Dict], prioritize_mongodb: bool = True) -> str:
+def _create_prioritized_context(contributions: List[Dict], faiss_chunks: List[Dict], prioritize_contributions: bool = True) -> str:
     """
-    Create context with MongoDB contributions prioritized
+    Create context with contribution results prioritized.
     
     Args:
-        contributions: MongoDB search results
+        contributions: contribution search results
         faiss_chunks: FAISS search results
-        prioritize_mongodb: Whether to prioritize MongoDB results
+        prioritize_contributions: Whether to prioritize contribution results
     
     Returns:
         Prioritized context string
     """
     context_parts = []
     
-    if prioritize_mongodb and contributions:
-        # MongoDB contributions first with emphasis
+    if prioritize_contributions and contributions:
+        # Contribution results first with emphasis
         contribution_contexts = []
         for i, contrib in enumerate(contributions, 1):
             question = contrib.get('question', '')
@@ -287,7 +286,7 @@ def get_enhanced_sources(faiss_chunks: List[Dict], contributions: List[Dict]) ->
     
     Args:
         faiss_chunks: FAISS search results
-        contributions: MongoDB contribution results
+        contributions: contribution results
     
     Returns:
         List of source information dictionaries
@@ -329,7 +328,7 @@ def prioritize_enhanced_results(faiss_chunks: List[Dict], contributions: List[Di
     
     Args:
         faiss_chunks: FAISS search results
-        contributions: MongoDB contribution results
+        contributions: contribution results
     
     Returns:
         Prioritized list of results

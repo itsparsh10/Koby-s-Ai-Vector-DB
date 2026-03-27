@@ -1,0 +1,9 @@
+{
+  "name": "koby-ai-vercel-edge",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Optional Vercel project that proxies to your Docker-hosted Django API. Replace BACKEND_URL in vercel.json after deployment.",
+  "scripts": {
+    "build": "test -d public || mkdir -p public; echo ok > public/.vercel-build"
+  }
+}

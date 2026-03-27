@@ -1742,7 +1742,7 @@
           if (data.success) {
             const stats = data.stats;
             
-            // Update top stat cards with real MongoDB data
+            // Update top stat cards with real database data
             document.querySelector('.card:nth-child(1) p').textContent = stats.live_users || 0;
             document.querySelector('.card:nth-child(2) p').textContent = stats.total_users || 0;
             document.getElementById('pendingQuestionsCount').textContent = stats.pending_questions || 0;
@@ -1756,11 +1756,11 @@
             document.getElementById("newUsersCount").textContent = stats.recent_users ? stats.recent_users.length : 0;
             document.getElementById("loggedInCount").textContent = stats.logged_in_users ? stats.logged_in_users.length : 0;
             
-            // Populate user tabs with MongoDB data
+            // Populate user tabs with database data
             populateNewUsersTab(stats.recent_users || []);
             populateLoggedInUsersTab(stats.logged_in_users || []);
 
-            console.log("Dashboard stats updated with MongoDB data successfully");
+            console.log("Dashboard stats updated with database data successfully");
           } else {
             console.error('Error fetching dashboard stats:', data.error);
           }
@@ -1788,7 +1788,7 @@
       // Show loading state
       const tbody = document.getElementById("sessionsTableBody");
       tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 30px;">
-        Loading user sessions from MongoDB...
+        Loading user sessions from database...
       </td></tr>`;
       
       fetch(url)
@@ -1840,7 +1840,7 @@
               <line x1="12" y1="16" x2="12.01" y2="16"></line>
             </svg>
             <h4>Connection Error</h4>
-            <p>Could not connect to the MongoDB database. Please check your connection and try again.</p>
+            <p>Could not connect to the database. Please check your connection and try again.</p>
           </td></tr>`;
         });
     }
@@ -1887,7 +1887,7 @@
       const searchQueryLower = searchQuery.toLowerCase();
       
       sessions.forEach(s => {
-        // Calculate session duration with better handling of MongoDB data
+        // Calculate session duration with resilient data handling
         let duration = "N/A";
         try {
           if (s.is_active === "active" && s.last_activity && s.login_time) {
@@ -2164,7 +2164,7 @@
       contentContainer.innerHTML = html;
     }
     
-    // Function to populate the logged in users tab with MongoDB data
+    // Function to populate the logged in users tab with database data
     function populateLoggedInUsersTab(users) {
       const loggedInTab = document.getElementById("loggedIn");
       const contentContainer = loggedInTab.querySelector("p").nextElementSibling || loggedInTab.appendChild(document.createElement("div"));
@@ -2272,7 +2272,7 @@
       refreshBtn.classList.add('auto-refresh-active');
       
       refreshTimer = setInterval(() => {
-        console.log('Auto-refreshing dashboard data from MongoDB...');
+        console.log('Auto-refreshing dashboard data from database...');
         
         // Fetch dashboard stats and compare with previous values
         fetch('/api/auth/dashboard-stats/')
